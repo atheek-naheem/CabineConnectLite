@@ -1,0 +1,53 @@
+# Secrets and local pulse state
+.env
+.env.*
+!.env.example
+.pulse/
+# NOTE: pulses.log is intentionally NOT ignored. Commit it as evidence.
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+
+# Logs and temporary files
+*.tmp
+npm-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.gradle/
+packages/
+
+# Build output
+dist/
+build/
+out/
+target/
+bin/
+obj/
+*.class
+*.o
+*.exe
+*.dll
+
+# Test and coverage output
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+TestResults/

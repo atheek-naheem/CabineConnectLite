@@ -1,0 +1,7 @@
+# Replace @ORGANIZER with the organizer's GitHub user or team before distributing.
+# These paths are provided by the organizer and should not be changed by teams.
+
+/.claude/skills/requirements-elaboration/  @ORGANIZER
+/tools/                       @ORGANIZER
+/docs/input/                  @ORGANIZER
+/docs/process/                @ORGANIZER
