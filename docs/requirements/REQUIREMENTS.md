@@ -26,8 +26,8 @@ These terms are used with exactly this meaning throughout the document.
 
 | Role | Description | Allowed | Not allowed |
 |---|---|---|---|
-| Member | A resident who wants to use the cabin. | See which dates the cabin is unavailable within the bookable window; submit a booking request for a date range; see all of their own bookings with state and any recorded reason; withdraw their own `Pending` request before its check-in date; cancel their own `Approved` booking before its check-in date. | See who made any other booking, or any detail of another member's booking; see the list of all bookings; see which user changed a booking's state or when, including on their own bookings; approve or reject requests; cancel or withdraw a booking they do not own; cancel their own booking on or after its check-in date; change the dates of a submitted booking; submit a booking for another member. |
-| Administrator | A committee member who oversees bookings. | See all bookings, including who made each one and its state; see the full state-change history of any booking, including which user acted and when; approve a `Pending` request; reject a `Pending` request, optionally recording a reason; cancel any booking that has not finished, including one in progress, optionally recording a reason. | Create a booking, for themselves or on behalf of a member; cancel a finished booking; change the dates of any booking; approve or reject a booking that is not `Pending`; alter or remove a recorded state-change entry. |
+| Member | A resident who wants to use the cabin. | See which dates the cabin is unavailable within the bookable window; submit a booking request for a date range; see all of their own bookings with state and any recorded reason; withdraw their own `Pending` request before its check-in date; cancel their own `Approved` booking before its check-in date; optionally record a reason when cancelling or withdrawing; request dates that were previously rejected. | See who made any other booking, or any detail of another member's booking; see the list of all bookings; see which user changed a booking's state or when, including on their own bookings; approve or reject requests; cancel or withdraw a booking they do not own; cancel their own booking on or after its check-in date; change the dates of a submitted booking; submit a booking for another member. |
+| Administrator | A committee member who oversees bookings. | See all bookings, including who made each one and its state; see the requests awaiting a decision; see the full state-change history of any booking, including which user acted and when; approve a `Pending` request; reject a `Pending` request, optionally recording a reason; cancel any booking that has not finished, including one in progress, optionally recording a reason. | Create a booking, for themselves or on behalf of a member; cancel a finished booking; change the dates of any booking; approve or reject a booking that is not `Pending`; alter or remove a recorded state-change entry. |
 
 ## 2. Functional requirements
 
@@ -36,19 +36,20 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-001 | Show which dates the cabin is unavailable, covering at least the bookable window (today through 90 days after today). Unavailable dates are shown without the owner's identity and without distinguishing `Pending` from `Approved`. | Member | Input: What #1; A-009; A-013 |
 | REQ-002 | Submit a booking request for a check-in date and a check-out date. An accepted request is recorded in state `Pending` and immediately holds its dates. | Member | Input: What #2; A-001; A-005 |
 | REQ-003 | Validate every booking request against all business rules (BR-001 to BR-006) at submission, and re-evaluate the current state of a booking on every state-changing action, rejecting the action if the state no longer permits it. | Member, Administrator | Input: Business rules #1–#4; A-001 |
-| REQ-004 | List the acting member's own bookings in every state — `Pending`, `Approved` (including in progress and finished), `Cancelled`, `Rejected`, `Expired` — showing the dates, the state, and the reason if one was recorded. | Member | Input: What #3; Input: Business rules #6; A-016; A-017 |
-| REQ-005 | Cancel an own `Approved` booking whose check-in date is after today. The booking moves to `Cancelled` and its dates are freed. | Member | Input: What #4; Input: Business rules #5 |
-| REQ-006 | Withdraw an own `Pending` request whose check-in date is after today. The request moves to `Cancelled` and its dates are freed. | Member | A-007 |
-| REQ-007 | List all bookings in every state, each with the owner's identity, the dates and the state. | Administrator | Input: What #5 |
+| REQ-004 | List the acting member's own bookings in every state — `Pending`, `Approved` (including in progress and finished), `Cancelled`, `Rejected`, `Expired` — showing the dates, the state, and the reason if one was recorded, ordered by check-in date with the soonest first. | Member | Input: What #3; Input: Business rules #6; A-016; A-017; A-026 |
+| REQ-005 | Cancel an own `Approved` booking whose check-in date is after today, optionally recording a reason. The booking moves to `Cancelled` and its dates are freed. | Member | Input: What #4; Input: Business rules #5; A-025 |
+| REQ-006 | Withdraw an own `Pending` request whose check-in date is after today, optionally recording a reason. The request moves to `Cancelled` and its dates are freed. | Member | A-007; A-025 |
+| REQ-007 | List all bookings in every state, each with the owner's identity, the dates and the state, ordered by check-in date with the soonest first. | Administrator | Input: What #5; A-026 |
 | REQ-008 | Approve a `Pending` request. The booking moves to `Approved` and keeps holding its dates. | Administrator | A-001 |
 | REQ-009 | Reject a `Pending` request, optionally recording a reason. The booking moves to `Rejected` and its dates are freed. | Administrator | A-001; A-017 |
-| REQ-010 | Cancel any booking that has not finished, including one in progress, optionally recording a reason. The booking moves to `Cancelled` and its dates, from today onward, are freed. | Administrator | Input: What #6; A-011; A-017 |
+| REQ-010 | Cancel any booking that has not finished, including one in progress, optionally recording a reason. The booking moves to `Cancelled` and its dates, from today onward, are freed. Its recorded check-in and check-out dates stay as they were booked. | Administrator | Input: What #6; A-011; A-017; A-024 |
 | REQ-011 | Keep `Cancelled`, `Rejected` and `Expired` bookings visible in history while their dates are available to other bookings. | Member, Administrator | Input: Business rules #6; A-001; A-008 |
 | REQ-012 | Move a `Pending` request to `Expired` once its check-in date has arrived without an administrator decision, freeing its dates. No administrator action is possible on it afterwards. | — (system) | A-008 |
 | REQ-013 | Let a person select which seeded user to act as, and enforce that user's role permissions on every action. | Member, Administrator | Input: Constraints |
 | REQ-014 | Provide exactly two seeded members and one seeded administrator, available without any setup step on first start. | — (system) | Input: Constraints; A-018 |
 | REQ-015 | Record a state-change entry for every accepted state change of a booking — submission, approval, rejection, member cancellation, administrator cancellation and automatic expiry — capturing the resulting state, the user who caused it (the system, for expiry), the UTC timestamp, and the reason if given. Entries are append-only. Refused actions change no state and create no entry. | — (system) | A-020 |
 | REQ-016 | Show the full state-change history of any booking, in order, including which user acted and when. | Administrator | A-020; A-021 |
+| REQ-017 | List the requests awaiting a decision — every booking still in state `Pending` — with the owner's identity and the dates, ordered by check-in date with the soonest first, so the most urgent decisions come first. | Administrator | A-022; A-026 |
 
 ## 3. Non-functional requirements
 
@@ -75,7 +76,7 @@ These terms are used with exactly this meaning throughout the document.
 | BR-008 | An administrator can cancel any booking that has not finished, including one in progress. A finished booking cannot be cancelled by anyone. | Input: What #6; A-011 | REQ-010 |
 | BR-009 | `Cancelled`, `Rejected` and `Expired` bookings free their dates for other bookings and remain in history permanently. No booking is ever deleted. | Input: Business rules #6; A-008 | REQ-004, REQ-007, REQ-011 |
 | BR-010 | An administrator never creates a booking. Only a member creates bookings, and only for themselves. | A-004 | REQ-002 |
-| BR-011 | A booking's dates are fixed once submitted. Changing dates means cancelling and submitting a new request. | A-012 | REQ-002, REQ-005 |
+| BR-011 | A booking's dates are fixed once submitted, and stay as booked even when the booking is cancelled part-way through the stay. Changing dates means cancelling and submitting a new request. | A-012; A-024 | REQ-002, REQ-005, REQ-010 |
 | BR-012 | The owner of a booking is the member who submitted it, and it never changes. | Input: What #5; A-004 | REQ-004, REQ-005, REQ-007 |
 | BR-013 | A booking may begin on the check-out date of another booking; that date is not a shared night. | A-002 | BR-001, REQ-002 |
 | BR-014 | Whether a date is past, today or future, and whether a booking has started or finished, is decided against the current UTC date. | A-014 | BR-004, BR-005, BR-007, BR-008 |
@@ -83,7 +84,9 @@ These terms are used with exactly this meaning throughout the document.
 | BR-016 | Only a `Pending` booking can be approved or rejected, and only an `Approved` unfinished booking can be cancelled by an administrator. Each booking reaches a terminal state (`Cancelled`, `Rejected`, `Expired`, or finished) at most once. | A-001; A-011 | REQ-003, REQ-008, REQ-009, REQ-010 |
 | BR-017 | Every accepted state change is recorded once, append-only. A recorded entry is never modified or removed, and entries are kept for as long as the booking exists. | A-020 | REQ-015, REQ-016 |
 | BR-018 | Which user changed a booking's state, and when, is visible to administrators only. A member sees the state and the reason on their own bookings, never the acting user or the timestamps. | A-021 | REQ-004, REQ-016 |
-| BR-019 | A reason is optional on a rejection and on an administrator cancellation, and is at most 500 characters when supplied. | A-019 | REQ-009, REQ-010 |
+| BR-019 | A reason is optional on a rejection, on an administrator cancellation, and on a member's own cancellation or withdrawal, and is at most 500 characters when supplied. | A-019; A-025 | REQ-005, REQ-006, REQ-009, REQ-010 |
+| BR-020 | A rejection places no restriction on the dates it frees. Any member, including the one whose request was rejected, may request them again. | A-023 | REQ-002, REQ-009 |
+| BR-021 | Beyond the 2 unfinished bookings per member, the 7-night maximum and the 90-day horizon, no further quota limits how much of the cabin a member may book — no seasonal or per-period allowance applies. | A-027 | BR-002, BR-005, BR-006 |
 
 ## 5. Validation rules
 
@@ -100,10 +103,11 @@ These terms are used with exactly this meaning throughout the document.
 | VAL-009 | Member cancellation (REQ-005, REQ-006) | The booking exists, is owned by the acting member, is `Pending` or `Approved`, and its check-in date is after today (BR-007, BR-012). | Refused, stating which condition failed: not the member's booking, already in a terminal state, or already started. State is unchanged. |
 | VAL-010 | Approve / reject (REQ-008, REQ-009) | The acting user's role is Administrator and the booking is `Pending` (BR-016). | Refused, stating the acting role is not permitted or reporting the booking's current state. State is unchanged. |
 | VAL-011 | Administrator cancellation (REQ-010) | The acting user's role is Administrator, the booking is `Approved`, and check-out is after today (BR-008). | Refused, stating the acting role is not permitted or that a finished booking cannot be cancelled. State is unchanged. |
-| VAL-012 | Reason on reject / cancel | Optional. If supplied, it is at most 500 characters and is recorded verbatim and shown to the owner; if omitted, the state change is recorded without one (BR-019). | A reason longer than 500 characters is refused, naming the field and the limit. The booking's state is unchanged and no state-change entry is recorded. |
+| VAL-012 | Reason on a rejection, an administrator cancellation, or a member's own cancellation or withdrawal | Optional. If supplied, it is at most 500 characters and is recorded verbatim and shown to the owner; if omitted, the state change is recorded without one (BR-019). | A reason longer than 500 characters is refused, naming the field and the limit. The booking's state is unchanged and no state-change entry is recorded. |
 | VAL-013 | Acting user selection (REQ-013) | The selected user is one of the seeded users. | Action refused; no booking data is read or written on behalf of an unknown user. |
 | VAL-014 | Any booking read | A member's request for booking detail is limited to bookings they own (BR-012, A-009). | Refused without revealing whether the booking exists or who owns it. |
 | VAL-015 | State-change history read (REQ-016) | The acting user's role is Administrator (BR-018). | Refused as not permitted; no acting user or timestamp is disclosed, not even for the member's own bookings. |
+| VAL-016 | Pending queue read (REQ-017) | The acting user's role is Administrator. | Refused as not permitted; no booking belonging to another member is disclosed. |
 
 ## 6. Error scenarios
 
@@ -125,8 +129,9 @@ These terms are used with exactly this meaning throughout the document.
 | ERR-014 | A booking request is submitted with a malformed or missing date. | Refused, naming the offending field; nothing is created. | VAL-001 |
 | ERR-015 | An action is attempted with no acting user selected, or an unknown one. | Refused; the person is asked to select a seeded user. | VAL-013 |
 | ERR-016 | A member acts on a view that has become stale — for example the dates were taken, or the date rolled over so the booking has now started. | The action is re-validated at the moment it is performed and refused if a rule now fails; the refusal explains what changed. | REQ-003, BR-014 |
-| ERR-017 | An administrator supplies a reason longer than 500 characters when rejecting or cancelling. | Refused, naming the 500-character limit; the booking's state is unchanged and nothing is recorded. | BR-019, VAL-012 |
+| ERR-017 | An administrator or a member supplies a reason longer than 500 characters when rejecting, cancelling or withdrawing. | Refused, naming the 500-character limit; the booking's state is unchanged and nothing is recorded. | BR-019, VAL-012 |
 | ERR-018 | A member tries to see who changed a booking's state, or when, including on a booking they own. | Refused as not permitted; no acting user or timestamp is disclosed. | BR-018, VAL-015 |
+| ERR-019 | A member tries to open the queue of requests awaiting a decision. | Refused as not permitted; no other member's request is disclosed. | VAL-016, REQ-017 |
 
 ## 7. Edge cases
 
@@ -143,7 +148,7 @@ These terms are used with exactly this meaning throughout the document.
 | EC-009 | A member's new request overlaps their own `Pending` request. | Refused on the overlap rule, exactly as for another member's booking. | BR-001 |
 | EC-010 | A booking is cancelled, rejected or expired. | Its dates become immediately available to any member, including the same member. | BR-009, REQ-011 |
 | EC-011 | The UTC date rolls over onto a `Pending` request's check-in date. | The request becomes `Expired` from that moment; a subsequent approval attempt is refused. | BR-015, REQ-012 |
-| EC-012 | An administrator cancels a booking that is in progress. | Accepted. Nights from today onward are freed; the booking remains in history as `Cancelled`. | BR-008, REQ-010 |
+| EC-012 | An administrator cancels a booking that is in progress. | Accepted. Nights from today onward are freed; the booking remains in history as `Cancelled` with its original check-in and check-out dates intact, so history shows what was booked rather than what was used. | BR-008, BR-011, REQ-010, A-024 |
 | EC-013 | The UTC date rolls over onto an `Approved` booking's check-in date. | The member can no longer cancel it; only an administrator can. | BR-007, BR-008 |
 | EC-014 | A member's booking finishes (check-out ≤ today). | It stops counting toward the limit, stays visible in the member's own list, and can no longer be cancelled by anyone. | BR-006, BR-008, REQ-004 |
 | EC-015 | Two adjacent bookings share a date, one checking out and one checking in. | Both are valid and both are shown; the shared date is unavailable for a new check-in only if it is an occupied night of some booking. | BR-013, REQ-001 |
@@ -153,7 +158,10 @@ These terms are used with exactly this meaning throughout the document.
 | EC-019 | A reason of exactly 500 characters. | Accepted and recorded in full. 501 characters is refused. | BR-019, VAL-012 |
 | EC-020 | A `Pending` request expires automatically, with no user acting. | A state-change entry is recorded with the system as the actor and the UTC timestamp of the expiry. | REQ-012, REQ-015 |
 | EC-021 | A booking that has only ever been submitted and is still `Pending`. | Its history holds exactly one entry, the submission, attributed to the owner. | REQ-015, REQ-016 |
-| EC-022 | An administrator views the history of a booking that was cancelled by its owner. | The member cancellation appears attributed to that member, alongside the submission entry. | REQ-015, REQ-016 |
+| EC-022 | An administrator views the history of a booking that was cancelled by its owner. | The member cancellation appears attributed to that member, alongside the submission entry, with the member's reason if they gave one. | REQ-015, REQ-016, A-025 |
+| EC-023 | A member's request is rejected and they immediately request the same dates again. | Accepted, provided every other rule still holds; a rejection carries no cooling-off period. | BR-020, A-023 |
+| EC-024 | No request is awaiting a decision. | The queue clearly shows there is nothing to decide rather than appearing empty or broken. | REQ-017, NFR-006 |
+| EC-025 | Two members hold pending requests, one starting sooner than the other. | The queue lists the one starting soonest first. | REQ-017, A-026 |
 
 ## 8. Security considerations
 
@@ -193,6 +201,12 @@ These terms are used with exactly this meaning throughout the document.
 | A-019 | Resolves Q-001: the input does not say whether a rejection or cancellation reason has limits. | (a) Optional, 500-character limit; (b) optional, no limit; (c) required on cancellation only, 500 limit; (d) required for both, 500 limit. | (a) Optional on both rejection and administrator cancellation, at most 500 characters. | Neema (product owner), 2026-09-28. Iteration 2. |
 | A-020 | Resolves Q-002: the input does not say whether history records which user changed a booking's state. | (a) Administrator actions only; (b) every state change, giving a full audit trail; (c) not recorded at all. | (b) Every state change is recorded with the acting user (the system for expiry) and a UTC timestamp. | Neema (product owner), 2026-09-28. Iteration 2. The chat-based disputes in the background are what this record settles. |
 | A-021 | Follows A-020: the input does not say who may see the recorded acting user and timestamps. | (a) Administrators only; (b) administrators plus the owner for their own bookings. | (a) Administrators only. A member sees state and reason on their own bookings, never who acted or when. | Neema (product owner), 2026-09-28. Iteration 2. |
+| A-022 | The input describes an administrator who "oversees bookings" but, with approval added by A-001, never says how they find the requests awaiting a decision. | (a) Add a dedicated list of requests awaiting a decision; (b) rely on the all-bookings list in REQ-007. | (a) A dedicated list of pending requests (REQ-017). | Neema (product owner), 2026-09-28. Iteration 3. A pending request holds dates and a member slot, so the queue must be easy to find. |
+| A-023 | The input does not say whether dates freed by a rejection may be requested again, by the same member or anyone else. | (a) No restriction; (b) the rejected member may not request overlapping dates again. | (a) No restriction; a rejection frees the dates for everyone, including the member whose request was rejected. | Neema (product owner), 2026-09-28. Iteration 3. |
+| A-024 | Follows A-011: when an administrator cancels a stay already in progress, the input does not say what the record should then show. | (a) Keep the original check-in and check-out dates; (b) shorten check-out to today so the record shows the nights actually used. | (a) Keep the original dates, consistent with BR-011. | Neema (product owner), 2026-09-28. Iteration 3. History shows what was booked, not what was used. |
+| A-025 | The input does not say whether a member explains their own cancellation; A-019 gave a reason only to administrators. | (a) No reason from members; (b) an optional reason, at most 500 characters, recorded and visible to administrators. | (b) A member may record an optional reason when cancelling or withdrawing. | Neema (product owner), 2026-09-28. Iteration 3. |
+| A-026 | The input does not say in what order bookings are listed. | (a) By check-in date, soonest first; (b) leave it to the design stage; (c) most recently submitted first. | (a) By check-in date, soonest first, in every list including the pending queue. | Neema (product owner), 2026-09-28. Iteration 3. The product owner delegated the choice, asking only that it stay simple; one order for every list is the simplest testable rule. |
+| A-027 | The input gives business rule 4 as its only fairness limit, with no seasonal or per-period quota. | (a) Rule 4, the 7-night maximum and the 90-day horizon are the only limits; (b) add a further quota. | (a) No further limit. | Neema (product owner), 2026-09-28. Iteration 3. Confirmed as deliberate, not an omission. |
 
 ## 10. Open questions
 
@@ -210,15 +224,19 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-001 | AC-001-3 | Given today is 1 June, when a member views availability, then at least every date from 1 June through 30 August (today + 90 days) is represented. |
 | REQ-002 | AC-002-1 | Given no conflicting booking and a member with fewer than 2 unfinished bookings, when the member submits check-in 10 June and check-out 13 June, then a booking is recorded in state `Pending`, owned by that member, for 3 nights. |
 | REQ-002 | AC-002-2 | Given the request of AC-002-1 was accepted, when any member views availability, then 10, 11 and 12 June are unavailable. |
+| REQ-002 | AC-002-3 | Given a member's request for 10 to 13 June was rejected, when the same member submits 10 to 13 June again and every other rule holds, then the new request is accepted in state `Pending`. |
 | REQ-003 | AC-003-1 | Given a request that breaks any of BR-001 to BR-006, when it is submitted, then no booking is created and the response names the rule that was broken. |
 | REQ-003 | AC-003-2 | Given a `Pending` request that a member withdrew, when an administrator approves it, then the action is refused and the booking remains `Cancelled`. |
 | REQ-004 | AC-004-1 | Given a member owns one `Pending`, one `Approved` future, one finished, one `Cancelled`, one `Rejected` and one `Expired` booking, when they view their own bookings, then all six appear with their dates and state. |
 | REQ-004 | AC-004-2 | Given an administrator rejected the member's request with the reason "cabin closed for repairs", when the member views their own bookings, then that reason is shown against the `Rejected` booking. |
 | REQ-004 | AC-004-3 | Given another member owns a booking, when a member views their own bookings, then that booking does not appear. |
+| REQ-004 | AC-004-4 | Given a member owns bookings checking in on 20 June, 5 June and 12 June, when they view their own bookings, then the 5 June one is listed first and the 20 June one last. |
 | REQ-005 | AC-005-1 | Given an `Approved` booking owned by the acting member with check-in after today, when the member cancels it, then its state becomes `Cancelled` and its nights become available to other members. |
 | REQ-005 | AC-005-2 | Given an `Approved` booking owned by the acting member with check-in equal to today, when the member cancels it, then the action is refused and the booking stays `Approved`. |
+| REQ-005 | AC-005-3 | Given an `Approved` booking owned by the acting member with check-in after today, when the member cancels it giving the reason "plans changed", then the cancellation succeeds and an administrator viewing its history sees that reason against the cancellation. |
 | REQ-006 | AC-006-1 | Given a `Pending` request owned by the acting member with check-in after today, when the member withdraws it, then its state becomes `Cancelled`, its dates are freed, and it still appears in their own list. |
 | REQ-007 | AC-007-1 | Given bookings owned by both seeded members in several states, when the administrator views all bookings, then every booking appears with its owner's name, dates and state. |
+| REQ-007 | AC-007-2 | Given bookings checking in on different dates, when the administrator views all bookings, then they are ordered by check-in date with the soonest first. |
 | REQ-008 | AC-008-1 | Given a `Pending` request, when the administrator approves it, then its state becomes `Approved`, its dates remain unavailable, and the owner sees it as approved. |
 | REQ-008 | AC-008-2 | Given an `Approved` booking, when the administrator approves it again, then the action is refused and the state is unchanged. |
 | REQ-009 | AC-009-1 | Given a `Pending` request, when the administrator rejects it with a reason, then its state becomes `Rejected`, the reason is stored, and its nights become available to other members. |
@@ -239,6 +257,9 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-015 | AC-015-3 | Given an action that is refused, for example a rejection with a 501-character reason, when the booking's history is viewed, then no entry was added for the refused attempt. |
 | REQ-016 | AC-016-1 | Given bookings owned by both seeded members, when the administrator views any booking's history, then every entry is shown in order with the acting user and the UTC timestamp. |
 | REQ-016 | AC-016-2 | Given a member owns a booking that an administrator rejected, when the member views it, then the state and the reason are shown but no acting user and no timestamps. |
+| REQ-017 | AC-017-1 | Given two `Pending` requests from different members and several `Approved`, `Cancelled` and `Rejected` bookings, when the administrator views the queue of requests awaiting a decision, then only the two `Pending` requests appear, each with its owner and dates. |
+| REQ-017 | AC-017-2 | Given `Pending` requests checking in on 20 June and 5 June, when the administrator views the queue, then the 5 June request is listed first. |
+| REQ-017 | AC-017-3 | Given a `Pending` request is approved, rejected, withdrawn or expires, when the administrator views the queue again, then it no longer appears. |
 | NFR-001 | AC-N001-1 | Given bookings in several states, a recorded rejection reason and several state-change entries, when the application is stopped and started again, then every booking, state, reason and history entry is unchanged. |
 | NFR-003 | AC-N003-1 | Given an administrator-only or ownership-restricted action is invoked directly, bypassing the user interface, when the acting user lacks the permission, then the action is refused and nothing is changed. |
 | NFR-006 | AC-N006-1 | Given each of ERR-001 to ERR-006, when the action is refused, then the message names the specific rule that blocked it rather than a generic failure. |
@@ -255,14 +276,15 @@ These terms are used with exactly this meaning throughout the document.
 - [x] The team has read the document and agrees with it.
 
 - **Gate result:** passed
-- **Completed at (UTC, ISO 8601):** 2026-09-28T05:32:17Z
+- **Completed at (UTC, ISO 8601):** 2026-09-28T05:42:57Z
 - **Confirmed by:** Neema, product owner
-- **Counts reported in pulse:** requirements=16, assumptions=21, open_questions=0
+- **Counts reported in pulse:** requirements=17, assumptions=27, open_questions=0
 
 | Iteration | Scope | Gate | Completed (UTC) | Confirmed by | Counts |
 |---|---|---|---|---|---|
 | 1 | Initial elaboration of the business input; REQ-001 to REQ-014, A-001 to A-018, Q-001 and Q-002 opened. | passed | 2026-09-28T05:22:45Z | Neema, product owner | requirements=14, assumptions=18, open_questions=2 |
 | 2 | Resolved Q-001 and Q-002. Added A-019 to A-021, REQ-015, REQ-016, BR-017 to BR-019, VAL-015, ERR-017, ERR-018, EC-019 to EC-022, SEC-007, SEC-008; updated VAL-012, the role table and AC-N001-1. | passed | 2026-09-28T05:32:17Z | Neema, product owner | requirements=16, assumptions=21, open_questions=0 |
+| 3 | Fresh ambiguity pass, no change to the business input. Added A-022 to A-027, REQ-017, BR-020, BR-021, VAL-016, ERR-019, EC-023 to EC-025 and six acceptance criteria; updated the role table, REQ-004 to REQ-007, REQ-010, BR-011, BR-019, VAL-012, ERR-017, EC-012 and EC-022. | passed | 2026-09-28T05:42:57Z | Neema, product owner | requirements=17, assumptions=27, open_questions=0 |
 
 ### Traceability of the business input
 
