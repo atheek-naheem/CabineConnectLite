@@ -20,13 +20,14 @@ These terms are used with exactly this meaning throughout the document.
 | Unfinished booking | A holding booking that is not finished. These count toward a member's booking limit. | A-006, A-010 |
 | Owner | The member who submitted the booking. | Input: What the community needs #5 |
 | Acting user | The seeded user currently selected; every action is evaluated against this user's role. | Input: Constraints |
+| State-change entry | One append-only record of a booking reaching a state: the resulting state, the user who caused it (or the system, for automatic expiry), the UTC timestamp, and the reason if one was given. | A-020 |
 
 ## 1. User roles
 
 | Role | Description | Allowed | Not allowed |
 |---|---|---|---|
-| Member | A resident who wants to use the cabin. | See which dates the cabin is unavailable within the bookable window; submit a booking request for a date range; see all of their own bookings with state; withdraw their own `Pending` request before its check-in date; cancel their own `Approved` booking before its check-in date. | See who made any other booking, or any detail of another member's booking; see the list of all bookings; approve or reject requests; cancel or withdraw a booking they do not own; cancel their own booking on or after its check-in date; change the dates of a submitted booking; submit a booking for another member. |
-| Administrator | A committee member who oversees bookings. | See all bookings, including who made each one and its state; approve a `Pending` request; reject a `Pending` request, optionally recording a reason; cancel any booking that has not finished, including one in progress, optionally recording a reason. | Create a booking, for themselves or on behalf of a member; cancel a finished booking; change the dates of any booking; approve or reject a booking that is not `Pending`. |
+| Member | A resident who wants to use the cabin. | See which dates the cabin is unavailable within the bookable window; submit a booking request for a date range; see all of their own bookings with state and any recorded reason; withdraw their own `Pending` request before its check-in date; cancel their own `Approved` booking before its check-in date. | See who made any other booking, or any detail of another member's booking; see the list of all bookings; see which user changed a booking's state or when, including on their own bookings; approve or reject requests; cancel or withdraw a booking they do not own; cancel their own booking on or after its check-in date; change the dates of a submitted booking; submit a booking for another member. |
+| Administrator | A committee member who oversees bookings. | See all bookings, including who made each one and its state; see the full state-change history of any booking, including which user acted and when; approve a `Pending` request; reject a `Pending` request, optionally recording a reason; cancel any booking that has not finished, including one in progress, optionally recording a reason. | Create a booking, for themselves or on behalf of a member; cancel a finished booking; change the dates of any booking; approve or reject a booking that is not `Pending`; alter or remove a recorded state-change entry. |
 
 ## 2. Functional requirements
 
@@ -46,6 +47,8 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-012 | Move a `Pending` request to `Expired` once its check-in date has arrived without an administrator decision, freeing its dates. No administrator action is possible on it afterwards. | — (system) | A-008 |
 | REQ-013 | Let a person select which seeded user to act as, and enforce that user's role permissions on every action. | Member, Administrator | Input: Constraints |
 | REQ-014 | Provide exactly two seeded members and one seeded administrator, available without any setup step on first start. | — (system) | Input: Constraints; A-018 |
+| REQ-015 | Record a state-change entry for every accepted state change of a booking — submission, approval, rejection, member cancellation, administrator cancellation and automatic expiry — capturing the resulting state, the user who caused it (the system, for expiry), the UTC timestamp, and the reason if given. Entries are append-only. Refused actions change no state and create no entry. | — (system) | A-020 |
+| REQ-016 | Show the full state-change history of any booking, in order, including which user acted and when. | Administrator | A-020; A-021 |
 
 ## 3. Non-functional requirements
 
@@ -78,6 +81,9 @@ These terms are used with exactly this meaning throughout the document.
 | BR-014 | Whether a date is past, today or future, and whether a booking has started or finished, is decided against the current UTC date. | A-014 | BR-004, BR-005, BR-007, BR-008 |
 | BR-015 | A `Pending` request that reaches its check-in date without a decision becomes `Expired` and is never approvable. | A-008 | REQ-012 |
 | BR-016 | Only a `Pending` booking can be approved or rejected, and only an `Approved` unfinished booking can be cancelled by an administrator. Each booking reaches a terminal state (`Cancelled`, `Rejected`, `Expired`, or finished) at most once. | A-001; A-011 | REQ-003, REQ-008, REQ-009, REQ-010 |
+| BR-017 | Every accepted state change is recorded once, append-only. A recorded entry is never modified or removed, and entries are kept for as long as the booking exists. | A-020 | REQ-015, REQ-016 |
+| BR-018 | Which user changed a booking's state, and when, is visible to administrators only. A member sees the state and the reason on their own bookings, never the acting user or the timestamps. | A-021 | REQ-004, REQ-016 |
+| BR-019 | A reason is optional on a rejection and on an administrator cancellation, and is at most 500 characters when supplied. | A-019 | REQ-009, REQ-010 |
 
 ## 5. Validation rules
 
@@ -94,9 +100,10 @@ These terms are used with exactly this meaning throughout the document.
 | VAL-009 | Member cancellation (REQ-005, REQ-006) | The booking exists, is owned by the acting member, is `Pending` or `Approved`, and its check-in date is after today (BR-007, BR-012). | Refused, stating which condition failed: not the member's booking, already in a terminal state, or already started. State is unchanged. |
 | VAL-010 | Approve / reject (REQ-008, REQ-009) | The acting user's role is Administrator and the booking is `Pending` (BR-016). | Refused, stating the acting role is not permitted or reporting the booking's current state. State is unchanged. |
 | VAL-011 | Administrator cancellation (REQ-010) | The acting user's role is Administrator, the booking is `Approved`, and check-out is after today (BR-008). | Refused, stating the acting role is not permitted or that a finished booking cannot be cancelled. State is unchanged. |
-| VAL-012 | Reason on reject / cancel | Optional. If supplied, it is recorded verbatim and shown to the owner; if omitted, the state change is recorded without one. | Not applicable; an absent reason is valid. See Q-001 for length limits. |
+| VAL-012 | Reason on reject / cancel | Optional. If supplied, it is at most 500 characters and is recorded verbatim and shown to the owner; if omitted, the state change is recorded without one (BR-019). | A reason longer than 500 characters is refused, naming the field and the limit. The booking's state is unchanged and no state-change entry is recorded. |
 | VAL-013 | Acting user selection (REQ-013) | The selected user is one of the seeded users. | Action refused; no booking data is read or written on behalf of an unknown user. |
 | VAL-014 | Any booking read | A member's request for booking detail is limited to bookings they own (BR-012, A-009). | Refused without revealing whether the booking exists or who owns it. |
+| VAL-015 | State-change history read (REQ-016) | The acting user's role is Administrator (BR-018). | Refused as not permitted; no acting user or timestamp is disclosed, not even for the member's own bookings. |
 
 ## 6. Error scenarios
 
@@ -118,6 +125,8 @@ These terms are used with exactly this meaning throughout the document.
 | ERR-014 | A booking request is submitted with a malformed or missing date. | Refused, naming the offending field; nothing is created. | VAL-001 |
 | ERR-015 | An action is attempted with no acting user selected, or an unknown one. | Refused; the person is asked to select a seeded user. | VAL-013 |
 | ERR-016 | A member acts on a view that has become stale — for example the dates were taken, or the date rolled over so the booking has now started. | The action is re-validated at the moment it is performed and refused if a rule now fails; the refusal explains what changed. | REQ-003, BR-014 |
+| ERR-017 | An administrator supplies a reason longer than 500 characters when rejecting or cancelling. | Refused, naming the 500-character limit; the booking's state is unchanged and nothing is recorded. | BR-019, VAL-012 |
+| ERR-018 | A member tries to see who changed a booking's state, or when, including on a booking they own. | Refused as not permitted; no acting user or timestamp is disclosed. | BR-018, VAL-015 |
 
 ## 7. Edge cases
 
@@ -141,6 +150,10 @@ These terms are used with exactly this meaning throughout the document.
 | EC-016 | Every date in the visible window is booked. | The availability view clearly shows no dates are free rather than appearing empty or broken. | REQ-001, NFR-006 |
 | EC-017 | The person switches acting user midway through a task. | Subsequent actions are evaluated against the newly selected user's role and ownership; nothing carries over from the previous user. | REQ-013, NFR-003 |
 | EC-018 | A request spans the end of the 90-day window with its check-in inside it. | Refused, because the whole stay must fall within the horizon (check-out ≤ today + 90 days). | BR-005, VAL-005 |
+| EC-019 | A reason of exactly 500 characters. | Accepted and recorded in full. 501 characters is refused. | BR-019, VAL-012 |
+| EC-020 | A `Pending` request expires automatically, with no user acting. | A state-change entry is recorded with the system as the actor and the UTC timestamp of the expiry. | REQ-012, REQ-015 |
+| EC-021 | A booking that has only ever been submitted and is still `Pending`. | Its history holds exactly one entry, the submission, attributed to the owner. | REQ-015, REQ-016 |
+| EC-022 | An administrator views the history of a booking that was cancelled by its owner. | The member cancellation appears attributed to that member, alongside the submission entry. | REQ-015, REQ-016 |
 
 ## 8. Security considerations
 
@@ -152,6 +165,8 @@ These terms are used with exactly this meaning throughout the document.
 | SEC-004 | All input is validated by the application before it is acted on, and free text such as a recorded reason is treated as untrusted when it is stored and shown. | VAL-001, VAL-012 |
 | SEC-005 | No booking is ever destroyed, so history cannot be silently rewritten; state changes only move a booking forward to a terminal state. | BR-009, BR-016 |
 | SEC-006 | Seed data contains no real personal data, and no secrets or credentials are committed to the repository. | Input: Constraints; `CLAUDE.md` |
+| SEC-007 | The state-change history reveals which member submitted or cancelled a booking, so it is an administrator-only view; exposing it to members would leak the owner identities that SEC-002 protects. | A-021, BR-018, VAL-015, SEC-002 |
+| SEC-008 | The state-change history is the record that settles disputes about who booked or cancelled what, so entries are append-only and no role can edit or delete them. | BR-017, REQ-015 |
 
 ## 9. Assumptions
 
@@ -175,13 +190,16 @@ These terms are used with exactly this meaning throughout the document.
 | A-016 | "A member can see their own bookings" together with "Cancelled bookings ... should remain visible in the history." | (a) All states, with the state shown; (b) upcoming only. | (a) A member sees their own bookings in every state. | Neema (product owner), 2026-09-28. |
 | A-017 | The input does not say whether a rejection or an administrator cancellation carries an explanation. | (a) No reason recorded; (b) an optional reason recorded and visible to the owner. | (b) An optional reason, shown to the booking's owner. Notifications remain out of scope. | Neema (product owner), 2026-09-28. |
 | A-018 | "at least two members and one administrator" must be seeded. | (a) Exactly 2 members and 1 administrator; (b) 3 members and 1 administrator. | (a) Exactly 2 members and 1 administrator. | Neema (product owner), 2026-09-28. |
+| A-019 | Resolves Q-001: the input does not say whether a rejection or cancellation reason has limits. | (a) Optional, 500-character limit; (b) optional, no limit; (c) required on cancellation only, 500 limit; (d) required for both, 500 limit. | (a) Optional on both rejection and administrator cancellation, at most 500 characters. | Neema (product owner), 2026-09-28. Iteration 2. |
+| A-020 | Resolves Q-002: the input does not say whether history records which user changed a booking's state. | (a) Administrator actions only; (b) every state change, giving a full audit trail; (c) not recorded at all. | (b) Every state change is recorded with the acting user (the system for expiry) and a UTC timestamp. | Neema (product owner), 2026-09-28. Iteration 2. The chat-based disputes in the background are what this record settles. |
+| A-021 | Follows A-020: the input does not say who may see the recorded acting user and timestamps. | (a) Administrators only; (b) administrators plus the owner for their own bookings. | (a) Administrators only. A member sees state and reason on their own bookings, never who acted or when. | Neema (product owner), 2026-09-28. Iteration 2. |
 
 ## 10. Open questions
 
 | ID | Question | Impact | Interim handling | Status |
 |---|---|---|---|---|
-| Q-001 | Are there limits on the optional reason recorded with a rejection or an administrator cancellation — maximum length, or required rather than optional in some case? | Affects VAL-012 and what the owner sees in REQ-004. Low: only the reason field. | Treated as optional free text, recorded verbatim, with no enforced maximum length. | Open |
-| Q-002 | Should history record which user rejected or cancelled a booking, and when? The input asks only that cancelled bookings stay visible. | Affects REQ-004, REQ-007 and BR-009. Medium: adds data to every state change if wanted. | Not recorded; only the resulting state and the optional reason are kept. | Open |
+| Q-001 | Are there limits on the optional reason recorded with a rejection or an administrator cancellation — maximum length, or required rather than optional in some case? | Affects VAL-012 and what the owner sees in REQ-004. Low: only the reason field. | No longer needed. | **Resolved** in iteration 2 by A-019: optional on both, at most 500 characters. See BR-019, VAL-012, ERR-017, EC-019. |
+| Q-002 | Should history record which user rejected or cancelled a booking, and when? The input asks only that cancelled bookings stay visible. | Affects REQ-004, REQ-007 and BR-009. Medium: adds data to every state change if wanted. | No longer needed. | **Resolved** in iteration 2 by A-020 and A-021: every state change is recorded, visible to administrators only. See REQ-015, REQ-016, BR-017, BR-018. |
 
 ## 11. Acceptance criteria
 
@@ -205,6 +223,7 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-008 | AC-008-2 | Given an `Approved` booking, when the administrator approves it again, then the action is refused and the state is unchanged. |
 | REQ-009 | AC-009-1 | Given a `Pending` request, when the administrator rejects it with a reason, then its state becomes `Rejected`, the reason is stored, and its nights become available to other members. |
 | REQ-009 | AC-009-2 | Given a `Pending` request, when the administrator rejects it without a reason, then the rejection succeeds and no reason is stored. |
+| REQ-009 | AC-009-3 | Given a `Pending` request, when the administrator rejects it with a 500-character reason, then the rejection succeeds and the reason is stored in full; with a 501-character reason the action is refused and the booking stays `Pending`. |
 | REQ-010 | AC-010-1 | Given an `Approved` booking with check-in after today, when the administrator cancels it, then its state becomes `Cancelled` and its dates are freed. |
 | REQ-010 | AC-010-2 | Given an `Approved` booking with check-in ≤ today < check-out, when the administrator cancels it, then the cancellation succeeds and the nights from today onward become available. |
 | REQ-010 | AC-010-3 | Given an `Approved` booking with check-out ≤ today, when the administrator cancels it, then the action is refused and the booking stays as it was. |
@@ -215,7 +234,12 @@ These terms are used with exactly this meaning throughout the document.
 | REQ-013 | AC-013-2 | Given the acting user is the administrator, when a booking creation is attempted, then it is refused. |
 | REQ-013 | AC-013-3 | Given a member owns a booking, when the acting user is switched to the other member and that member attempts to cancel it, then the action is refused. |
 | REQ-014 | AC-014-1 | Given a freshly started application with no prior data, when the user list is inspected, then exactly two members and one administrator exist and each can be selected as the acting user. |
-| NFR-001 | AC-N001-1 | Given bookings in several states and a recorded rejection reason, when the application is stopped and started again, then every booking, state and reason is unchanged. |
+| REQ-015 | AC-015-1 | Given a member submits a request, the administrator approves it, and the administrator then cancels it with a reason, when the administrator views its history, then three entries appear in that order — submitted by the member, approved by the administrator, cancelled by the administrator with the reason — each carrying a UTC timestamp. |
+| REQ-015 | AC-015-2 | Given a `Pending` request that expires automatically, when the administrator views its history, then the expiry entry is attributed to the system rather than to a user. |
+| REQ-015 | AC-015-3 | Given an action that is refused, for example a rejection with a 501-character reason, when the booking's history is viewed, then no entry was added for the refused attempt. |
+| REQ-016 | AC-016-1 | Given bookings owned by both seeded members, when the administrator views any booking's history, then every entry is shown in order with the acting user and the UTC timestamp. |
+| REQ-016 | AC-016-2 | Given a member owns a booking that an administrator rejected, when the member views it, then the state and the reason are shown but no acting user and no timestamps. |
+| NFR-001 | AC-N001-1 | Given bookings in several states, a recorded rejection reason and several state-change entries, when the application is stopped and started again, then every booking, state, reason and history entry is unchanged. |
 | NFR-003 | AC-N003-1 | Given an administrator-only or ownership-restricted action is invoked directly, bypassing the user interface, when the acting user lacks the permission, then the action is refused and nothing is changed. |
 | NFR-006 | AC-N006-1 | Given each of ERR-001 to ERR-006, when the action is refused, then the message names the specific rule that blocked it rather than a generic failure. |
 
@@ -231,9 +255,14 @@ These terms are used with exactly this meaning throughout the document.
 - [x] The team has read the document and agrees with it.
 
 - **Gate result:** passed
-- **Completed at (UTC, ISO 8601):** 2026-09-28T05:22:45Z
+- **Completed at (UTC, ISO 8601):** 2026-09-28T05:32:17Z
 - **Confirmed by:** Neema, product owner
-- **Counts reported in pulse:** requirements=14, assumptions=18, open_questions=2
+- **Counts reported in pulse:** requirements=16, assumptions=21, open_questions=0
+
+| Iteration | Scope | Gate | Completed (UTC) | Confirmed by | Counts |
+|---|---|---|---|---|---|
+| 1 | Initial elaboration of the business input; REQ-001 to REQ-014, A-001 to A-018, Q-001 and Q-002 opened. | passed | 2026-09-28T05:22:45Z | Neema, product owner | requirements=14, assumptions=18, open_questions=2 |
+| 2 | Resolved Q-001 and Q-002. Added A-019 to A-021, REQ-015, REQ-016, BR-017 to BR-019, VAL-015, ERR-017, ERR-018, EC-019 to EC-022, SEC-007, SEC-008; updated VAL-012, the role table and AC-N001-1. | passed | 2026-09-28T05:32:17Z | Neema, product owner | requirements=16, assumptions=21, open_questions=0 |
 
 ### Traceability of the business input
 
@@ -241,7 +270,7 @@ Every statement in `docs/input/BUSINESS_REQUIREMENTS.md` and where it is covered
 
 | Input statement | Covered by |
 |---|---|
-| Background: double bookings, arguments, no clear record | BR-001, REQ-007, REQ-011, NFR-006 |
+| Background: double bookings, arguments, no clear record | BR-001, REQ-007, REQ-011, REQ-015, REQ-016, NFR-006 |
 | Users: Member | Role table, REQ-001 to REQ-006 |
 | Users: Administrator | Role table, REQ-007 to REQ-010 |
 | What #1: member sees booked dates | REQ-001, A-009 |
